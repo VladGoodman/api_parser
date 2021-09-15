@@ -8,15 +8,18 @@ class Connect
     private $date;
     private $path;
     private $method;
+    private $token;
     public $result_url;
+    public $sleep = 5;
 
 
-    public function __construct(string $url, string $date, string $path, string $method)
+    public function __construct($url,$date,$path,$method)
     {
         $this->url = $url;
         $this->date = $date;
         $this->path = $path;
         $this->method = $method;
+        $this->token = file_get_contents('token.txt');
         if (!$this->date && !$this->path){
             $this->result_url = "https://mpstats.io/api/wb/".$this->url;
 
@@ -42,15 +45,32 @@ class Connect
             CURLOPT_POSTFIELDS => "{
         \"startRow\":0,\"filterModel\":{},\"sortModel\":[{\"colId\":\"revenue\",\"sort\":\"desc\"}]}",
             CURLOPT_HTTPHEADER => array(
-                "X-Mpstats-TOKEN: 60f991cb23a8a4.55242720a2cbcb3f06383121730e03c23e2c8a79",
+                "X-Mpstats-TOKEN: ".$this->token,
                 "Content-Type: application/json"
             ),
         ));
 
         $response = curl_exec($curl);
-
+        $getInfo = curl_getinfo($curl);
+        if($getInfo['http_code'] !== 200 ){
+            if($getInfo['http_code'] === 202){
+                print_r("\n[".date('H:i:s')."] Апи долго не отвечает, перезапуск через $this->sleep секунд...\n");
+                sleep($this->sleep);
+                $this->getInfoForApi();
+            }
+            if($getInfo['http_code'] === 401){
+                exit("\n[".date('H:i:s')."] Токен в файле token.txt не является действительным\n");
+            }
+            if($getInfo['http_code'] === 429){
+                exit("\n[".date('H:i:s')."] Допустимое колличество запросов закончилось\n");
+            } else{
+                print_r("\n[".date('H:i:s')."] Апи долго не отвечает, перезапуск через $this->sleep секунд...\n");
+                sleep($this->sleep);
+                $this->getInfoForApi();
+            }
+        }else{
+            return $response;
+        }
         curl_close($curl);
-        return $response;
     }
-
 }
