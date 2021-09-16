@@ -46,15 +46,22 @@ class Parser
         print_r("Проверка, сколько запросов было за сегодня...\n");
         if (!file_get_contents($this->log_inquiries_filename)) {
             file_put_contents($this->log_inquiries_filename, '');
-            file_put_contents($this->log_inquiries_filename, date('Y.m.d')."|0/$this->count_inquiries_stop");
+            file_put_contents($this->log_inquiries_filename, date('Y.m.d') . "|0/$this->count_inquiries_stop"."\n");
         }
         $change_file = file($this->log_inquiries_filename);
         $explode_info = explode('|', $change_file[count($change_file) - 1]);
         $date = $explode_info[0];
-        $count_inquiries = $explode_info[1];
-        $this->count_inquiries_start = explode('/', $count_inquiries)[0];
+        if ($date !== date('Y.m.d')) {
+            file_put_contents($this->log_inquiries_filename, date('Y.m.d') . "|0/$this->count_inquiries_stop"."\n", FILE_APPEND);
+            $change_file = file($this->log_inquiries_filename);
+            $explode_info = explode('|', $change_file[count($change_file) - 1]);
+            $date = $explode_info[0];
+        }else{
+            $count_inquiries = $explode_info[1];
+            $this->count_inquiries_start = explode('/', $count_inquiries)[0];
+        }
         print_r("Запросов за сегодня [$date]: $this->count_inquiries_start/$this->count_inquiries_stop\n");
-        if($this->count_inquiries_start >= $this->count_inquiries_stop){
+        if ($this->count_inquiries_start >= $this->count_inquiries_stop) {
             exit("\nПарсер остановлен, так как выполнено $this->count_inquiries_start/$this->count_inquiries_stop запросов\n");
         }
     }
@@ -67,15 +74,15 @@ class Parser
         $count_inquiries = $explode_info[1];
         $this->count_inquiries_start = explode('/', $count_inquiries)[0];
         $result = '';
-        foreach ($change_file as $line){
-            if($line ==
-                ($date."|".$this->count_inquiries_start."/".$this->count_inquiries_stop."\n")){
-                $result .= ($date."|".(++$this->count_inquiries_start)."/".$this->count_inquiries_stop)."\n";
-            }else{
+        foreach ($change_file as $line) {
+            if ($line ==
+                ($date . "|" . $this->count_inquiries_start . "/" . $this->count_inquiries_stop . "\n")) {
+                $result .= ($date . "|" . (++$this->count_inquiries_start) . "/" . $this->count_inquiries_stop) . "\n";
+            } else {
                 $result .= $line;
             }
         }
-        if($this->count_inquiries_start >= $this->count_inquiries_stop){
+        if ($this->count_inquiries_start >= $this->count_inquiries_stop) {
             exit("\nПарсер остановлен, так как выполнено $this->count_inquiries_start/$this->count_inquiries_stop запросов\n");
         }
         file_put_contents($this->log_inquiries_filename, $result);
@@ -177,7 +184,7 @@ class Parser
         $count_string = 0;
         for ($item = $this->start; $item <= $this->end; $item++) {
             $this->changeInquiriesToday();
-            if(!isset($rows_categories[$item])){
+            if (!isset($rows_categories[$item])) {
                 exit("\nКатегория не определена, парсинг остановлен\n");
             }
             $request = new Connect('get/category/trends', '2021-07-05', $rows_categories[$item], "GET");
