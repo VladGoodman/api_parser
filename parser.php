@@ -102,7 +102,7 @@ class Parser
         file_put_contents($this->log_queue_filename, "$start/$end\n", FILE_APPEND);
         print_r("\rПозиция в очереди : $start/$end");
         if ((int)$start >= (int)$end) {
-            exit("\nВсе запросы были выплнены\n");
+            exit("\nВсе запросы были выполнены\n");
         }
     }
 
@@ -131,7 +131,7 @@ class Parser
             print_r("Очередь обнулена...\n");
             $this->start = 0;
             $this->end = $this->count_category;
-            print_r("\nОчередь китегорий обновлена : 0/$this->count_category\n");
+            print_r("\nОчередь категорий обновлена : 0/$this->count_category\n");
             return 1;
         }
         if (!file_get_contents($this->log_queue_filename)) {
@@ -161,7 +161,7 @@ class Parser
             $this->start = $count_queue[0];
             $this->end = $count_queue[1];
             if ((int)$this->start >= (int)$this->end) {
-                exit("\nВсе запросы были выплнены [$this->start / $this->end]\n");
+                exit("\nВсе запросы были выполнены [$this->start / $this->end]\n");
             }
             print_r("Обработано категорий : $this->start/$this->end\n");
             return 1;
@@ -183,7 +183,7 @@ class Parser
 
     public function loggingForCategory()
     {
-        print_r("\nЗапуск запросов информации по категириям...\n");
+        print_r("\nЗапуск запросов информации по категориям...\n");
         $info_categories = file_get_contents($this->log_category_urlencode_filename);
         $rows_categories = explode("\n", $info_categories);
         $count_string = 0;
