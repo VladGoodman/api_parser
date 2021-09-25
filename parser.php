@@ -14,6 +14,7 @@ class Parser
     private $count_items = 0;
     private $log_queue_filename = 'system_info/queue.log';
     private $log_category_filename = 'log_category.log';
+    private $log_category_urlencode_filename = 'log_category_urlencode.log';
     private $log_ready_filename = 'log_ready.csv';
     private $log_inquiries_filename = 'system_info/log_inquiries.log';
     private $restartQueue;
@@ -46,22 +47,22 @@ class Parser
         print_r("Проверка, сколько запросов было за сегодня...\n");
         if (!file_get_contents($this->log_inquiries_filename)) {
             file_put_contents($this->log_inquiries_filename, '');
-            file_put_contents($this->log_inquiries_filename, date('Y.m.d') . "|0/$this->count_inquiries_stop"."\n");
+            file_put_contents($this->log_inquiries_filename, date('Y.m.d') . "|0/$this->count_inquiries_stop" . "\n");
         }
         $change_file = file($this->log_inquiries_filename);
         $explode_info = explode('|', $change_file[count($change_file) - 1]);
         $date = $explode_info[0];
         if ($date !== date('Y.m.d')) {
-            file_put_contents($this->log_inquiries_filename, date('Y.m.d') . "|0/$this->count_inquiries_stop"."\n", FILE_APPEND);
+            file_put_contents($this->log_inquiries_filename, date('Y.m.d') . "|0/$this->count_inquiries_stop" . "\n", FILE_APPEND);
             $change_file = file($this->log_inquiries_filename);
             $explode_info = explode('|', $change_file[count($change_file) - 1]);
             $date = $explode_info[0];
-        }else{
+        } else {
             $count_inquiries = $explode_info[1];
             $this->count_inquiries_start = explode('/', $count_inquiries)[0];
         }
         print_r("Запросов за сегодня [$date]: $this->count_inquiries_start/$this->count_inquiries_stop\n");
-        if ($this->count_inquiries_start >= $this->count_inquiries_stop) {
+        if ($this->count_inquiries_start > $this->count_inquiries_stop) {
             exit("\nПарсер остановлен, так как выполнено $this->count_inquiries_start/$this->count_inquiries_stop запросов\n");
         }
     }
@@ -100,13 +101,16 @@ class Parser
     {
         file_put_contents($this->log_queue_filename, "$start/$end\n", FILE_APPEND);
         print_r("\rПозиция в очереди : $start/$end");
+        if ((int)$start >= (int)$end) {
+            exit("\nВсе запросы были выплнены\n");
+        }
     }
 
     private function addTitleForReadyLog($filename)
     {
         print_r('Установка заголовков...' . "\n");
         file_put_contents($filename, '');
-        file_put_contents($filename, implode(';', $this->title));
+        file_put_contents($filename, (implode(';', $this->title)."\n"));
     }
 
     public function buildQueueWithoutDailyStatistics()
@@ -145,6 +149,7 @@ class Parser
         } else {
             if ($this->restartCategory) {
                 file_put_contents($this->log_category_filename, '');
+                file_put_contents($this->log_category_urlencode_filename, '');
                 print_r("Перезапуск категорий...\n");
                 $this->parseCategory();
             }
@@ -155,6 +160,9 @@ class Parser
             $this->count_category = $count_queue[1];
             $this->start = $count_queue[0];
             $this->end = $count_queue[1];
+            if ((int)$this->start >= (int)$this->end) {
+                exit("\nВсе запросы были выплнены [$this->start / $this->end]\n");
+            }
             print_r("Обработано категорий : $this->start/$this->end\n");
             return 1;
         }
@@ -167,20 +175,17 @@ class Parser
             or
             gettype((int)$this->end) !== "integer"
         ) {
-            exit("\nОшибка очередей, отчистите файле queue.log\n");
+            exit("\nОшибка очередей, проверьте файл queue.log\n");
         } elseif ($this->start > $this->end) {
-            exit("\nОчереди были неправильно определены, отчистите файл queue.log\n");
+            exit("\nОчереди были неправильно определены, проверьте файл queue.log\n");
         }
     }
 
     public function loggingForCategory()
     {
         print_r("\nЗапуск запросов информации по категириям...\n");
-
-        $info_categories = file_get_contents($this->log_category_filename);
+        $info_categories = file_get_contents($this->log_category_urlencode_filename);
         $rows_categories = explode("\n", $info_categories);
-        $this->checkQueue();
-
         $count_string = 0;
         for ($item = $this->start; $item <= $this->end; $item++) {
             $this->changeInquiriesToday();
@@ -210,24 +215,75 @@ class Parser
                 }
             }
             $this->addInfoForQueue($item + 1, $this->end);
+            $this->checkQueue();
             $result = null;
         }
         print_r("\n--------------------\nОБРАБОТКА ЗАВЕРШЕНА\n--------------------\n");
     }
 
+
+    private function findToLogCategory($category)
+    {
+        $file = explode("\n", file_get_contents($this->log_category_filename));
+        foreach ($file as $line) {
+            if ($line === $category) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private function sendInLogCategory($string)
+    {
+        if ($this->findToLogCategory($string)) {
+            file_put_contents($this->log_category_filename, $string . "\n", FILE_APPEND);
+            $this->count_category += 1;
+        }
+    }
+
+    private function sendInEncodeLogCategory($string)
+    {
+        file_put_contents($this->log_category_urlencode_filename, urlencode($string) . "\n", FILE_APPEND);
+    }
+
+    private function parserItem($string)
+    {
+        $ready_massive = [];
+        $result = explode('/', $string);
+
+        foreach ($result as $result_key => $result_item) {
+            if ($result_key === 0) {
+                array_push($ready_massive, $result_item);
+                continue;
+            }
+            array_push($ready_massive, ($ready_massive[$result_key - 1] . '/' . $result_item));
+        }
+        foreach ($ready_massive as $sting_to_send) {
+            $this->sendInLogCategory($sting_to_send);
+        }
+    }
+
+
     public function parseCategory()
     {
         print_r("\nПоиск категорий...\n");
         file_put_contents($this->log_category_filename, '');
+        file_put_contents($this->log_category_urlencode_filename, '');
         if (file_exists($this->log_category_filename) and is_readable($this->log_category_filename)) {
             $request = new Connect('get/categories', '', '', "GET");
             $result = json_decode($request->getInfoForApi());
             foreach ($result as $item) {
                 if ($item->path !== "") {
-                    $this->count_category += 1;
-                    file_put_contents($this->log_category_filename, urlencode($item->path) . "\n", FILE_APPEND);
+                    $this->parserItem($item->path);
                 }
             }
+            print_r("\n[log_category.log] Категории, удобные для человеческого глаза готовы\n");
+            $items = explode("\n", file_get_contents($this->log_category_filename));
+            foreach ($items as $sting_to_send) {
+                $this->sendInEncodeLogCategory($sting_to_send);
+            }
+            print_r("\n[log_category_urlencode.log] Категории готовы к парсингу\n");
+
         }
         print_r("\nКатегорий найдено: $this->count_category\n");
     }
